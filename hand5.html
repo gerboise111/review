@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Replayer Poker : Arsenal FC Edition</title>
+    <style>
+        :root { 
+            --bg: #111111; 
+            --table-border: #DB0007; /* Rouge Arsenal */
+            --table-felt: #1b4d22;  /* Vert pelouse Emirates */
+            --accent-gold: #EFD18F; /* Or du blason d'Arsenal */
+            --white: #FFFFFF;
+            --player-bg: #1a1a1a;
+        }
+        
+        body { 
+            font-family: 'Segoe UI', -apple-system, sans-serif; 
+            background: var(--bg); 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0;
+            padding: 20px 0;
+            background-image: radial-gradient(circle, #222 10%, #0a0a0a 90%);
+        }
+        
+        /* Table façon pelouse de l'Emirates */
+        .table-area { 
+            background: var(--table-felt); 
+            width: 750px; 
+            height: 400px; 
+            border-radius: 200px; 
+            border: 14px solid var(--table-border); 
+            position: relative; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6), inset 0 0 120px rgba(0,0,0,0.7); 
+            margin-bottom: 25px;
+            
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+                radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,0,0,0.2) 100%);
+        }
+
+        /* Texte incrusté dans le tapis */
+        .table-inscription {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            text-align: center;
+            font-family: 'Georgia', 'Times New Roman', serif;
+            font-weight: 900;
+            font-size: 2.2rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--accent-gold);
+            opacity: 0.18;
+            mix-blend-mode: overlay;
+            text-shadow: 1px 1px 1px rgba(255,255,255,0.2), -1px -1px 1px rgba(0,0,0,0.7);
+            pointer-events: none;
+            z-index: 1;
+            line-height: 1.3;
+        }
+        
+        /* Affichage du Pot */
+        .pot-display { 
+            background: #000000; 
+            padding: 8px 30px; 
+            border-radius: 4px; 
+            color: var(--white); 
+            font-weight: 800; 
+            position: absolute; 
+            top: 26%; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            border: 2px solid var(--accent-gold); 
+            z-index: 10;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .pot-display span { color: var(--table-border); }
+
+        /* Joueurs - Configuration 6-Max avec HERO centré en bas */
+        .player { 
+            position: absolute; 
+            width: 115px; 
+            text-align: center; 
+            background: var(--player-bg); 
+            padding: 10px 6px; 
+            border-radius: 6px; 
+            border-left: 5px solid var(--table-border);
+            border-right: 1px solid #444;
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            transition: all 0.25s ease; 
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            z-index: 8;
+        }
+        .player.active-turn { 
+            border-color: var(--accent-gold); 
+            box-shadow: 0 0 20px rgba(239, 209, 143, 0.6); 
+            transform: scale(1.08); 
+        }
+        .player-name { font-size: 0.75rem; font-weight: 800; color: var(--white); letter-spacing: 0.5px; }
+        .player-stack { font-size: 0.85rem; color: var(--accent-gold); font-weight: bold; margin-top: 3px; }
+
+        /* Badge Dealer / Bouton */
+        .dealer-btn {
+            background: white;
+            color: black;
+            font-size: 0.65rem;
+            font-weight: bold;
+            padding: 2px 5px;
+            border-radius: 50%;
+            border: 1px solid black;
+            position: absolute;
+            bottom: -5px;
+            right: -5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        /* Positions HERO centré en bas */
+        .p-hero { bottom: -25px; left: 50%; transform: translateX(-50%); } 
+        .p-btn  { bottom: 35px; left: 35px; }                              
+        .p-sb   { top: 75px; left: 35px; }                                  
+        .p-vilain { top: -25px; left: 50%; transform: translateX(-50%); }  
+        .p-utg  { top: 75px; right: 35px; }                                 
+        .p-hj   { bottom: 35px; right: 35px; }                              
+
+        /* Board de cartes */
+        .board { position: absolute; top: 54%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 8px; z-index: 5; }
+        .card { width: 48px; height: 70px; background: white; border-radius: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 1.3rem; color: #111; visibility: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.5); }
+        .card.visible { visibility: visible; }
+        
+        /* Affichage des cartes des joueurs */
+        .player-cards { display: flex; gap: 4px; justify-content: center; margin-top: 6px; }
+        .small-card { width: 22px; height: 32px; background: white; border-radius: 3px; font-size: 0.7rem; color: black; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+
+        /* Couleurs des enseignes de cartes */
+        .c { color: #27ae60; } .d { color: #2980b9; } .h { color: var(--table-border); } .s { color: #111; }
+
+        /* Zones de Bet réajustées */
+        .bet { position: absolute; background: rgba(0,0,0,0.9); padding: 4px 14px; border-radius: 20px; font-size: 0.85rem; border: 1px solid var(--accent-gold); display: none; color: white; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 9; }
+        .bet-co  { bottom: 55px; left: 50%; transform: translateX(-50%); }
+        .bet-sb  { top: 115px; left: 165px; }
+        .bet-bb  { top: 65px; left: 50%; transform: translateX(-50%); }
+
+        /* Boutons des Streets */
+        .street-nav { display: flex; gap: 6px; margin-bottom: 15px; }
+        .street-nav button { background: #1c1c1c; font-size: 0.7rem; padding: 6px 14px; border: 1px solid #333; color: #aaa; cursor: pointer; border-radius: 3px; letter-spacing: 0.5px; }
+        .street-nav button:hover { background: var(--table-border); color: white; border-color: var(--table-border); }
+
+        /* Navigation */
+        .main-nav { display: flex; gap: 20px; margin-bottom: 25px; }
+        button { background: var(--table-border); color: var(--white); border: 2px solid var(--table-border); padding: 12px 35px; border-radius: 4px; cursor: pointer; font-weight: 800; letter-spacing: 1px; transition: all 0.2s ease; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        button:hover:not(:disabled) { background: transparent; color: var(--table-border); border-color: var(--table-border); }
+        button:disabled { opacity: 0.15; cursor: not-allowed; box-shadow: none; }
+
+        /* Zone de Déroulé Chronologique du Log */
+        .log-container { 
+            width: 600px; 
+            background: #151515; 
+            padding: 22px; 
+            border-radius: 4px; 
+            border-top: 4px solid var(--table-border); 
+            border-bottom: 4px solid var(--accent-gold); 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            max-height: 250px;
+            overflow-y: auto;
+            text-align: left;
+        }
+        
+        .log-line {
+            padding: 5px 0;
+            border-bottom: 1px solid #222;
+            color: #777;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+        
+        /* Style pour l'action en cours */
+        .log-line.active-log {
+            color: var(--white);
+            font-weight: bold;
+            font-size: 1.05rem;
+            border-left: 3px solid var(--accent-gold);
+            padding-left: 8px;
+        }
+        
+        /* Petit indicateur de Street (Flop, Turn...) */
+        .log-street-header {
+            color: var(--accent-gold);
+            font-weight: 800;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            margin-top: 8px;
+            margin-bottom: 2px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="table-area">
+        <div class="table-inscription">
+            Arsenal FC<br>Champion 2025 - 2026
+        </div>
+
+        <div class="pot-display">POT: <span id="pot">0</span> bb</div>
+        <div class="board" id="board">
+            <div id="b0" class="card"></div><div id="b1" class="card"></div><div id="b2" class="card"></div>
+            <div id="b3" class="card"></div><div id="b4" class="card"></div>
+        </div>
+
+        <!-- 6 Joueurs repositionnés avec HERO (CO) au milieu bas -->
+        <div class="player p-hero" id="player-co">
+            <div class="player-name">HERO (CO)</div>
+            <div class="player-stack" id="stack-co">113 bb</div>
+            <div class="player-cards" id="hero-cards"></div>
+        </div>
+        
+        <div class="player p-btn">
+            <div class="player-name">BTN</div><div class="player-stack">100 bb</div>
+            <div class="dealer-btn">D</div>
+        </div>
+        
+        <div class="player p-sb" id="player-sb">
+            <div class="player-name">SB</div><div class="player-stack" id="stack-sb">100 bb</div>
+        </div>
+        
+        <div class="player p-vilain" id="player-bb">
+            <div class="player-name">VILAIN (BB)</div>
+            <div class="player-stack" id="stack-bb">100 bb</div>
+            <div class="player-cards" id="vilain-cards"></div>
+        </div>
+        
+        <div class="player p-utg"><div class="player-name">UTG</div><div class="player-stack">100 bb</div></div>
+        <div class="player p-hj"><div class="player-name">HJ</div><div class="player-stack">100 bb</div></div>
+
+        <!-- Zones de Bet/Blinds -->
+        <div class="bet bet-co" id="bet-co"></div>
+        <div class="bet bet-sb" id="bet-sb"></div>
+        <div class="bet bet-bb" id="bet-bb"></div>
+    </div>
+
+    <div class="street-nav">
+        <button onclick="goToStreet('BLINDS')">BLINDS</button>
+        <button onclick="goToStreet('PRE')">PRÉ-FLOP</button>
+        <button onclick="goToStreet('FLOP')">FLOP</button>
+        <button onclick="goToStreet('TURN')">TURN</button>
+        <button onclick="goToStreet('RIVER')">RIVER</button>
+        <button onclick="goToStreet('SHOWDOWN')">SHOWDOWN</button>
+    </div>
+
+    <div class="main-nav">
+        <button id="prev" onclick="move(-1)">⬅ PRÉCÉDENT</button>
+        <button id="next" onclick="move(1)">SUIVANT ➡</button>
+    </div>
+
+    <!-- Zone d'historique cumulatif des actions -->
+    <div class="log-container" id="log-container"></div>
+
+    <script>
+        const hand = {
+            hero: ["5♦", "5♥"],
+            vilain: ["A♥", "J♦"], 
+            boardCards: ["7♣", "J♥", "Q♦", "4♣", "9♦"], 
+            actions: [
+                { id: 'BLINDS', header: 'Blinds', pot: "1.5", log: "Blinds posées : Petite Blind (SB) mise 0.5bb, Grosse Blind (BB) mise 1bb.", coBet: "", sbBet: "0.5 bb", bbBet: "1.0 bb", coStack: "113", sbStack: "99.5", bbStack: "99", cards: 0, active: '', showVilain: false },
+                { id: 'PRE', header: 'Pré-Flop', pot: "4.0", log: "Hero (CO) trouve une paire de 5 et relance (open) à 2.5bb.", coBet: "2.5 bb", sbBet: "0.5 bb", bbBet: "1.0 bb", coStack: "110.5", sbStack: "99.5", bbStack: "99", cards: 0, active: 'co', showVilain: false },
+                { id: 'PRE_FOLDS', header: '', pot: "4.0", log: "Le joueur au BTN se couche. La Petite Blind (SB) abandonne et fold également.", coBet: "2.5 bb", sbBet: "Fold", bbBet: "1.0 bb", coStack: "110.5", sbStack: "99.5", bbStack: "99", cards: 0, active: '', showVilain: false },
+                { id: 'PRE_CALL', header: '', pot: "5.5", log: "Vilain (BB) décide de payer et rajoute 1.5bb pour égaliser à 2.5bb (call).", coBet: "2.5 bb", sbBet: "", bbBet: "2.5 bb", coStack: "110.5", sbStack: "99.5", bbStack: "97.5", cards: 0, active: 'bb', showVilain: false },
+                { id: 'FLOP', header: 'Flop', pot: "5.5", log: "Le flop donne : 7♣ J♥ Q♦. Vilain (BB) choisit de checker.", coBet: "", sbBet: "", bbBet: "Check", coStack: "110.5", sbStack: "99.5", bbStack: "97.5", cards: 3, active: 'bb', showVilain: false },
+                { id: 'FLOP_BET', header: '', pot: "7.3", log: "Hero (CO) mise son avantage (C-Bet) à hauteur de 1.8bb.", coBet: "1.8 bb", sbBet: "", bbBet: "", coStack: "108.7", sbStack: "99.5", bbStack: "97.5", cards: 3, active: 'co', showVilain: false },
+                { id: 'FLOP_CALL', header: '', pot: "9.1", log: "Vilain s'accroche avec sa deuxième paire et call les 1.8bb.", coBet: "", sbBet: "", bbBet: "Call 1.8 bb", coStack: "108.7", sbStack: "99.5", bbStack: "95.7", cards: 3, active: 'bb', showVilain: false },
+                
+                // Décomposition de la TURN
+                { id: 'TURN', header: 'Turn', pot: "9.1", log: "La turn amène le 4♣. Vilain (BB) est le premier à parler et décide de checker.", coBet: "", sbBet: "", bbBet: "Check", coStack: "108.7", sbStack: "99.5", bbStack: "95.7", cards: 4, active: 'bb', showVilain: false },
+                { id: 'TURN_HERO', header: '', pot: "9.1", log: "Hero (CO) décide de ralentir également le rythme et check-back derrière.", coBet: "Check", sbBet: "", bbBet: "Check", coStack: "108.7", sbStack: "99.5", bbStack: "95.7", cards: 4, active: 'co', showVilain: false },
+                
+                // Décomposition de la RIVER
+                { id: 'RIVER', header: 'River', pot: "9.1", log: "La river est le 9♦. Le tableau final est figé. Vilain (BB) check une dernière fois.", coBet: "", sbBet: "", bbBet: "Check", coStack: "108.7", sbStack: "99.5", bbStack: "95.7", cards: 5, active: 'bb', showVilain: false },
+                { id: 'RIVER_HERO', header: '', pot: "9.1", log: "Hero (CO) refuse de bluffer et check-back également pour aller voir l'abattage.", coBet: "Check", sbBet: "", bbBet: "Check", coStack: "108.7", sbStack: "99.5", bbStack: "95.7", cards: 5, active: 'co', showVilain: false },
+                
+                { id: 'SHOWDOWN', header: 'Abattage / Showdown', pot: "9.1", log: "Showdown ! Vilain dévoile A♥ J♦ pour une paire de Valets kicker As. Hero montre sa paire de 5. Vilain remporte le pot de 9.1bb.", coBet: "", sbBet: "", bbBet: "", coStack: "108.7", sbStack: "99.5", bbStack: "104.8", cards: 5, active: '', showVilain: true }
+            ]
+        };
+
+        let step = 0;
+
+        function getSuitClass(c) {
+            if (c.includes('♣')) return 'c'; if (c.includes('♦')) return 'd';
+            if (c.includes('♥')) return 'h'; if (c.includes('♠')) return 's';
+            return '';
+        }
+
+        function render() {
+            const s = hand.actions[step];
+            document.getElementById('pot').innerText = s.pot;
+
+            document.getElementById('stack-co').innerText = s.coStack + " bb";
+            document.getElementById('stack-sb').innerText = s.sbStack + " bb";
+            document.getElementById('stack-bb').innerText = s.bbStack + " bb";
+
+            // Board
+            for(let i=0; i<5; i++) {
+                const b = document.getElementById('b'+i);
+                if (i < s.cards && hand.boardCards[i]) {
+                    b.innerText = hand.boardCards[i];
+                    b.className = `card ${getSuitClass(hand.boardCards[i])} visible`;
+                } else {
+                    b.className = `card`;
+                }
+            }
+
+            // Encarts Bets
+            const bCo = document.getElementById('bet-co'); bCo.innerText = s.coBet; bCo.style.display = s.coBet ? 'block' : 'none';
+            const bSb = document.getElementById('bet-sb'); bSb.innerText = s.sbBet; bSb.style.display = s.sbBet ? 'block' : 'none';
+            const bBb = document.getElementById('bet-bb'); bBb.innerText = s.bbBet; bBb.style.display = s.bbBet ? 'block' : 'none';
+
+            // Glow tour actif
+            document.getElementById('player-co').classList.toggle('active-turn', s.active === 'co');
+            document.getElementById('player-bb').classList.toggle('active-turn', s.active === 'bb');
+
+            // Cartes privatives
+            document.getElementById('hero-cards').innerHTML = hand.hero.map(c => `<div class="small-card ${getSuitClass(c)}">${c}</div>`).join('');
+            
+            if (s.showVilain) {
+                document.getElementById('vilain-cards').innerHTML = hand.vilain.map(c => `<div class="small-card ${getSuitClass(c)}">${c}</div>`).join('');
+            } else {
+                document.getElementById('vilain-cards').innerHTML = `<div class="small-card" style="background:#444;color:white">?</div><div class="small-card" style="background:#444;color:white">?</div>`;
+            }
+
+            // Génération de l'historique chronologique
+            let logHTML = "";
+            for (let i = 0; i <= step; i++) {
+                const action = hand.actions[i];
+                if (action.header) {
+                    logHTML += `<div class="log-street-header">--- ${action.header} ---</div>`;
+                }
+                const isActive = (i === step) ? 'active-log' : '';
+                logHTML += `<div class="log-line ${isActive}">${action.log}</div>`;
+            }
+            
+            const logContainer = document.getElementById('log-container');
+            logContainer.innerHTML = logHTML;
+            logContainer.scrollTop = logContainer.scrollHeight;
+
+            document.getElementById('prev').disabled = step === 0;
+            document.getElementById('next').disabled = step === hand.actions.length - 1;
+        }
+
+        function move(dir) { step += dir; render(); }
+        function goToStreet(id) { step = hand.actions.findIndex(a => a.id === id); render(); }
+
+        render();
+    </script>
+</body>
+</html>
