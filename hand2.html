@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Replayer Poker : Queens vs Turned Set</title>
+    <style>
+        :root { --bg: #0f0f0f; --table: #1a4a1a; --accent: #ffcc00; --player-bg: #222; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        
+        .table-area { background: var(--table); width: 800px; height: 440px; border-radius: 200px; border: 10px solid #333; position: relative; box-shadow: inset 0 0 100px rgba(0,0,0,0.8); margin-bottom: 20px; }
+        .pot-display { background: rgba(0,0,0,0.8); padding: 5px 20px; border-radius: 20px; color: var(--accent); font-weight: bold; position: absolute; top: 32%; left: 50%; transform: translateX(-50%); border: 1px solid var(--accent); z-index: 10; }
+
+        .player { position: absolute; width: 110px; text-align: center; background: var(--player-bg); padding: 8px; border-radius: 8px; border: 2px solid #444; transition: all 0.2s; }
+        .player.active-turn { border-color: var(--accent); box-shadow: 0 0 15px rgba(255,204,0,0.5); transform: scale(1.05); }
+        .player-name { font-size: 0.75rem; font-weight: bold; color: #999; }
+        .player-stack { font-size: 0.85rem; color: var(--accent); font-weight: bold; margin-top: 2px; }
+        
+        /* Configuration 6-Max */
+        .p-utg { top: 40px; right: 50px; }
+        .p-mp  { bottom: 80px; right: 40px; }
+        .p-co  { bottom: -20px; left: 65%; transform: translateX(-50%); }
+        .p-btn { bottom: -20px; left: 35%; transform: translateX(-50%); }
+        .p-sb  { bottom: 80px; left: 40px; }
+        .p-bb  { top: 40px; left: 50px; }
+
+        .board { position: absolute; top: 52%; left: 50%; transform: translate(-50%, -50%); display: flex; gap: 8px; }
+        .card { width: 48px; height: 70px; background: white; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 1.3rem; color: #111; visibility: hidden; }
+        .card.visible { visibility: visible; }
+        .hero-cards { display: flex; gap: 4px; justify-content: center; margin-top: 4px; }
+        .small-card { width: 22px; height: 32px; background: white; border-radius: 3px; font-size: 0.7rem; color: black; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+
+        .c { color: #27ae60; } .d { color: #2980b9; } .h { color: #e74c3c; } .s { color: #111; }
+
+        .bet { position: absolute; background: rgba(0,0,0,0.8); padding: 2px 12px; border-radius: 12px; font-size: 0.9rem; border: 1px solid #555; display: none; color: white; font-weight: bold; }
+        .bet-co  { bottom: 60px; right: 180px; }
+        .bet-bb  { top: 120px; left: 170px; }
+
+        .street-nav { display: flex; gap: 8px; margin-bottom: 15px; }
+        .street-nav button { background: #1a1a1a; font-size: 0.7rem; padding: 6px 12px; border: 1px solid #444; color: #999; cursor: pointer; }
+        .street-nav button:hover { background: var(--accent); color: black; }
+
+        .main-nav { display: flex; gap: 15px; margin-bottom: 20px; }
+        button { background: #222; color: white; border: 1px solid #555; padding: 12px 30px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        button:hover:not(:disabled) { border-color: var(--accent); }
+        button:disabled { opacity: 0.1; }
+
+        .log { width: 620px; background: #181818; padding: 20px; border-radius: 10px; border-bottom: 4px solid var(--accent); text-align: center; font-size: 1.1rem; min-height: 1.5em; }
+    </style>
+</head>
+<body>
+
+    <div class="table-area">
+        <div class="pot-display">POT: <span id="pot">0</span> bb</div>
+        <div class="board" id="board">
+            <div id="b0" class="card"></div><div id="b1" class="card"></div><div id="b2" class="card"></div>
+            <div id="b3" class="card"></div><div id="b4" class="card"></div>
+        </div>
+
+        <div class="player p-utg"><div class="player-name">UTG</div><div class="player-stack">100 bb</div></div>
+        <div class="player p-mp"><div class="player-name">MP</div><div class="player-stack">100 bb</div></div>
+        <div class="player p-co" id="player-co">
+            <div class="player-name">VILAIN (CO)</div>
+            <div class="player-stack" id="stack-co">103 bb</div>
+        </div>
+        <div class="player p-btn"><div class="player-name">BTN</div><div class="player-stack">100 bb</div></div>
+        <div class="player p-sb"><div class="player-name">SB</div><div class="player-stack">99.5 bb</div></div>
+        <div class="player p-bb" id="player-bb">
+            <div class="player-name">HERO (BB)</div>
+            <div class="player-stack" id="stack-bb">124 bb</div>
+            <div class="hero-cards" id="hero-cards"></div>
+        </div>
+
+        <div class="bet bet-co" id="bet-co"></div>
+        <div class="bet bet-bb" id="bet-bb"></div>
+    </div>
+
+    <div class="street-nav">
+        <button onclick="goToStreet('BLINDS')">BLINDS</button>
+        <button onclick="goToStreet('PRE')">PRÉ-FLOP</button>
+        <button onclick="goToStreet('FLOP')">FLOP</button>
+        <button onclick="goToStreet('TURN')">TURN</button>
+        <button onclick="goToStreet('RIVER')">RIVER</button>
+    </div>
+
+    <div class="main-nav">
+        <button id="prev" onclick="move(-1)">⬅ PRÉCÉDENT</button>
+        <button id="next" onclick="move(1)">SUIVANT ➡</button>
+    </div>
+
+    <div class="log" id="log">Début de la main...</div>
+
+    <script>
+        const hand = {
+            hero: ["Q♦", "Q♣"],
+            vilain: ["9♥", "9♦"],
+            boardCards: ["5♠", "7♣", "K♦", "9♣", "2♥"],
+            actions: [
+                { id: 'BLINDS', pot: "1.5", log: "Blinds posées (SB 0.5bb, Hero en BB 1bb).", coBet: "", bbBet: "", coStack: "103", bbStack: "123", cards: 0, active: '' },
+                { id: 'PRE', pot: "1.5", log: "Vilain (CO) open à 2.5bb. UTG, MP, BTN, SB fold.", coBet: "2.5", bbBet: "", coStack: "100.5", bbStack: "123", cards: 0, active: 'co' },
+                { id: 'PRE_RAISE', pot: "4.0", log: "Hero (BB) 3-bet agressivement à 12bb avec QdQc.", coBet: "2.5", bbBet: "12.0", coStack: "100.5", bbStack: "112", cards: 0, active: 'bb' },
+                { id: 'PRE_CALL', pot: "24.5", log: "Vilain (CO) paye le 3-bet.", coBet: "Call", bbBet: "", coStack: "91", bbStack: "112", cards: 0, active: 'co' },
+                { id: 'FLOP', pot: "24.5", log: "Flop: 5s 7c Kd. Un Roi apparaît. Hero Check prudemment.", coBet: "", bbBet: "Check", coStack: "91", bbStack: "112", cards: 3, active: 'bb' },
+                { id: 'FLOP_CHECK', pot: "24.5", log: "Vilain check-back également.", coBet: "Check", bbBet: "", coStack: "91", bbStack: "112", cards: 3, active: 'co' },
+                { id: 'TURN', pot: "24.5", log: "Turn: 9c. Le coup s'emballe. Hero mise 8bb pour reprendre le lead.", coBet: "", bbBet: "8.0", coStack: "91", bbStack: "104", cards: 4, active: 'bb' },
+                { id: 'TURN_RAISE', pot: "32.5", log: "Vilain relance (raise) à 23bb avec son brelan fraîchement trouvé. Hero call.", coBet: "23.0", bbBet: "Call", coStack: "68", bbStack: "91", cards: 4, active: 'co' },
+                { id: 'RIVER', pot: "70.5", log: "River: 2h (Brique). Hero Check.", coBet: "", bbBet: "Check", coStack: "68", bbStack: "91", cards: 5, active: 'bb' },
+                { id: 'RIVER_BET', pot: "70.5", log: "Vilain envoie une énorme praline à 68.5bb pour extraire le maximum de value.", coBet: "68.5", bbBet: "", coStack: "0.5", bbStack: "91", cards: 5, active: 'co' },
+                { id: 'RIVER_CALL', pot: "139.0", log: "Hero paye. Vilain retourne 9h9d pour un Brelan de 9. Vilain remporte ce très gros pot de 207.5bb.", coBet: "9h 9d", bbBet: "Call", coStack: "69", bbStack: "22.5", cards: 5, active: 'bb' }
+            ]
+        };
+
+        let step = 0;
+
+        function getSuitClass(c) {
+            if (c.includes('♣')) return 'c'; if (c.includes('♦')) return 'd';
+            if (c.includes('♥')) return 'h'; if (c.includes('♠')) return 's';
+            return '';
+        }
+
+        function render() {
+            const s = hand.actions[step];
+            document.getElementById('pot').innerText = s.pot;
+            document.getElementById('log').innerText = s.log;
+
+            // Mise à jour en temps réel des stacks
+            document.getElementById('stack-co').innerText = s.coStack + " bb";
+            document.getElementById('stack-bb').innerText = s.bbStack + " bb";
+
+            for(let i=0; i<5; i++) {
+                const b = document.getElementById('b'+i);
+                b.innerText = hand.boardCards[i];
+                b.className = `card ${getSuitClass(hand.boardCards[i])} ${i < s.cards ? 'visible' : ''}`;
+            }
+
+            const bCo = document.getElementById('bet-co'); bCo.innerText = s.coBet; bCo.style.display = s.coBet ? 'block' : 'none';
+            const bBb = document.getElementById('bet-bb'); bBb.innerText = s.bbBet; bBb.style.display = s.bbBet ? 'block' : 'none';
+
+            document.getElementById('player-co').classList.toggle('active-turn', s.active === 'co');
+            document.getElementById('player-bb').classList.toggle('active-turn', s.active === 'bb');
+            document.getElementById('hero-cards').innerHTML = hand.hero.map(c => `<div class="small-card ${getSuitClass(c)}">${c}</div>`).join('');
+
+            document.getElementById('prev').disabled = step === 0;
+            document.getElementById('next').disabled = step === hand.actions.length - 1;
+        }
+
+        function move(dir) { step += dir; render(); }
+        function goToStreet(id) { step = hand.actions.findIndex(a => a.id === id); render(); }
+
+        render();
+    </script>
+</body>
+</html>
